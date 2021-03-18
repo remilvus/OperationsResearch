@@ -1,5 +1,6 @@
 import tensorflow.keras.datasets.reuters as reuters
-import pathlib
+
+from LsiPreprocessing import *
 
 (x_train, y_train), (x_test, y_test) = reuters.load_data(
     path="op_lab_reuters_dataset.npz",
@@ -14,15 +15,5 @@ import pathlib
 )
 reuters.get_word_index(path="reuters_word_index.json")
 
-print("Documents:")
-print(x_train.shape)
-print(x_train[:5])
-
-print("\nLabels:")
-print(y_train.shape)
-print(y_train[:5])
-
-print("\nWord to index mapping:", pathlib.Path().home())
-data_path = pathlib.Path().home().joinpath(".keras/datasets/reuters_word_index.json")
-with data_path.open() as f:
-    print(f.read(100))
+corpus = generate_corpus(x_train, k=50)
+print("corpus created")
