@@ -1,5 +1,5 @@
 import random
-from LsiPreprocessing import load_corpus
+from corpus_preparation import load_corpus
 
 Kmin = 5
 Kmax = 50

@@ -1,6 +1,6 @@
 import tensorflow.keras.datasets.reuters as reuters
 
-from LsiPreprocessing import *
+from corpus_preparation import *
 
 (x_train, y_train), (x_test, y_test) = reuters.load_data(
     path="op_lab_reuters_dataset.npz",

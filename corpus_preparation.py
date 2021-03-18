@@ -1,3 +1,8 @@
+"""
+Convert data loaded from keras into our problem-specific format.
+Supports dimension shrinking.
+Results saved as csv, to avoid repeated computations.
+"""
 from scipy.sparse import lil_matrix
 import numpy as np
 from scipy.sparse.linalg import svds
