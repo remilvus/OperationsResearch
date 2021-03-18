@@ -12,6 +12,7 @@ ALL_WORDS = 30980 # how many words to consider
 LRA_K = 100  # default number of dimensions to shrink document to
 
 def generate_corpus(keras_dataset, k=LRA_K, max_words=ALL_WORDS, normalized=True):
+    """ generate and save to file preprocessed doc_by_term matrix """
     doc_by_term = to_document_by_term(keras_dataset, max_words)
     doc_by_term = scale_by_IDF(doc_by_term)
     if k < doc_by_term.shape[1]:
@@ -31,23 +32,26 @@ def to_document_by_term(keras_dataset, max_words=ALL_WORDS):
     return delete_unused_words(doc_by_term)
 
 def delete_unused_words(doc_by_term):
+    """ deleting all-zero columns - unnecessary and problematic for IDF """
     all_zero_col = (doc_by_term == 0).all(0)
     return doc_by_term[:, ~all_zero_col]
 
 def scale_by_IDF(doc_by_term):
+    """ represent words by inverse document frequency, to add weight to less common words. """
     N = doc_by_term.shape[0]
     DF = np.count_nonzero(doc_by_term, axis=0)
     IDF = np.log2(N / DF)
     return doc_by_term*IDF
 
 def shrink_corpus(doc_by_term, k):
-    """ apply lra using first k singular values of doc_by_term (converted to sparse matrix) """
+    """ apply low rank approximation using first k singular values of doc_by_term (converted to sparse matrix) """
     doc_term_s = lil_matrix(doc_by_term)
     u, s, vt = svds(doc_term_s.T, k=k, which='LM')
     new_corpus = doc_term_s @ u
     return new_corpus
 
 def normalize(doc_by_term):
+    """ normalize matrix by rows, so that each document is a unit vector """
     norm = np.linalg.norm(doc_by_term, axis=1)
     return doc_by_term / norm[:, None]
 
