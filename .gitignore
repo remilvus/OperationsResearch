@@ -1,3 +1,4 @@
+corpus.csv
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -127,3 +128,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/.idea/.gitignore
+/make
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/OperationsResearch.iml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/vcs.xml
