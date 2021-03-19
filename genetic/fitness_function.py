@@ -1,5 +1,6 @@
+from sklearn.metrics import davies_bouldin_score
 from numpy.linalg import norm
-from numpy import mean, zeros
+from numpy import zeros
 import numpy as np
 
 def cosine_dist(a, b, normalized=False):
@@ -36,45 +37,9 @@ class DB:
         '''
         """
         centers_ord = np.argmin(self.dist_matrix[:, chromosome], axis=1)
-        docs_idx_by_center = {}
-        for i in range(len(chromosome)):
-            center_idx = chromosome[i]
-            docs_idx_by_center[center_idx] = np.where(centers_ord == i)
-        return docs_idx_by_center
+        return [chromosome[i] for i in centers_ord]
 
-    def Si(self, center_idx, assigned_docs_idx):
-        val = mean(self.dist_matrix[center_idx, assigned_docs_idx])
-        return val
+    def davies_bouldin(self, chromosome):
+        centers = self.assign_centers(chromosome)
+        return davies_bouldin_score(self.doc_by_term, centers)
 
-    def Mij(self, center_i, center_j):
-        return self.dist_matrix[center_i, center_j]
-
-    def Rij(self, center_i, center_j, docs_idx_by_center):
-        S_sum = self.Si(center_i, docs_idx_by_center[center_i]) + self.Si(center_j, docs_idx_by_center[center_j])
-        return S_sum / self.Mij(center_i, center_j)
-
-    def Di(self, ith_gene: int, chromosome, docs_idx_by_center):
-        all_Rij = (self.Rij(chromosome[ith_gene], chromosome[jth_gene], docs_idx_by_center)
-                      for jth_gene in range(len(chromosome)) if jth_gene != ith_gene)
-        return max(all_Rij)
-
-    def DB(self, chromosome):
-        docs_idx_by_center = self.assign_centers(chromosome)
-        all_Dis = [self.Di(ith_gene, chromosome, docs_idx_by_center) for ith_gene in range(len(chromosome))]
-        return mean(all_Dis)
-
-doc_by_term = np.array([[1.2, 3.1, 4],
-                        [3.1, 0, 1.1],
-                        [1.1, 3.1, 4],
-                        [3, 0.5, 1.2]])
-chrom = [0, 1]
-mydb = DB(doc_by_term)
-print(mydb.dist_matrix)
-print(mydb.DB(chrom))
-chrom = [0, 2]
-print(mydb.DB(chrom))
-chrom = [0,1,2]
-print(mydb.DB(chrom))
-chrom = [0,1,2,3]
-print(mydb.DB(chrom))
-# todo assign centers to each doc - create dict {center: docs}
