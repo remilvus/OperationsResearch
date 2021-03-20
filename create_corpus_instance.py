@@ -14,6 +14,6 @@ from corpus_preparation import *
     index_from=3,  # Index actual words with this index and higher.
 )
 reuters.get_word_index(path="reuters_word_index.json")
-
-corpus = generate_corpus(x_train, k=50)
+print(x_train.shape)
+corpus = generate_corpus(x_train[:4000], k=60, filename='corpus4k60.csv')
 print("corpus created")

@@ -11,7 +11,7 @@ from scipy.sparse.linalg import svds
 ALL_WORDS = 30980 # how many words to consider
 LRA_K = 100  # default number of dimensions to shrink document to
 
-def generate_corpus(keras_dataset, k=LRA_K, max_words=ALL_WORDS, normalized=True):
+def generate_corpus(keras_dataset, k=LRA_K, max_words=ALL_WORDS, normalized=True, filename='corpus.csv'):
     """ generate and save to file preprocessed doc_by_term matrix """
     doc_by_term = to_document_by_term(keras_dataset, max_words)
     doc_by_term = scale_by_IDF(doc_by_term)
@@ -19,7 +19,7 @@ def generate_corpus(keras_dataset, k=LRA_K, max_words=ALL_WORDS, normalized=True
         doc_by_term = shrink_corpus(doc_by_term, k)
     if normalized:
         doc_by_term = normalize(doc_by_term)
-    save_corpus(doc_by_term)
+    save_corpus(doc_by_term, filename)
 
 def to_document_by_term(keras_dataset, max_words=ALL_WORDS):
     """ convert keras' dataset format: each document is a list of words represented as integers,
