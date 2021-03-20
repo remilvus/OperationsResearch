@@ -1,7 +1,10 @@
 from sklearn.metrics import davies_bouldin_score, pairwise_distances_argmin
 
-def davies_bouldin(doc_by_term, chromosome):
-    centers = assign_centers_dynamic(doc_by_term, chromosome)
+def calculate_invDB_fitness(doc_by_term, chromosomes_list):
+    return [1/davies_bouldin(doc_by_term, chromosome) for chromosome in chromosomes_list]
+
+def davies_bouldin(doc_by_term, centers):
+    centers = assign_centers_dynamic(doc_by_term, centers)
     db = davies_bouldin_score(doc_by_term, centers)
     return db
 
