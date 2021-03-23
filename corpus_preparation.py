@@ -55,9 +55,9 @@ def normalize(doc_by_term):
     norm = np.linalg.norm(doc_by_term, axis=1)
     return doc_by_term / norm[:, None]
 
-def save_corpus(corpus, filename='corpus.csv'):
-    np.savetxt(filename, corpus, delimiter=',')
+def save_corpus(corpus, filename='corpus.csv', **kwargs):
+    np.savetxt(filename, corpus, delimiter=',', **kwargs)
 
-def load_corpus(filename='corpus.csv'):
-    return np.loadtxt(filename, delimiter=',')
+def load_corpus(filename='corpus.csv', **kwargs):
+    return np.loadtxt(filename, delimiter=',', **kwargs)
 

@@ -14,6 +14,9 @@ from corpus_preparation import *
     index_from=3,  # Index actual words with this index and higher.
 )
 reuters.get_word_index(path="reuters_word_index.json")
-print(x_train.shape)
 corpus = generate_corpus(x_train[:4000], k=60, filename='corpus4k60.csv')
+save_corpus(y_train, "labels.csv", fmt="%i")
 print("corpus created")
+
+# labels = load_corpus("labels.csv", dtype=int)
+# print('labels saved')
