@@ -32,12 +32,12 @@ class KrillHerd:
         mul = 0.1
         self.n_max = 0.1 * mul
         self.f_max = 0.3 * mul
-        self.d_max = 0.5 * 10e-10 * mul
+        self.d_max = 0.0005 * mul
         self.n_old = np.zeros(shape=(krill_count, num_docs))
         self.f_old = np.zeros(shape=(krill_count, num_docs))
         self.d_old = np.zeros(shape=(krill_count, num_docs))
         self.inertia = 0.5  # todo: set better value
-        self.c_t = 1.  # todo: set better value
+        self.c_t = 1.  # speed scaling factor # todo: set better value
         self.dt = self.num_clusters / 2 # unused for now
 
         # init genetic parameters
@@ -69,13 +69,18 @@ class KrillHerd:
             # print("F", fitness)
         return np.array(fitness) / self.num_clusters
 
-    def get_K(self):
+    def get_K(self): # output was manually checked
+        """Matrix of normalised fitness difference.
+        K[i, j] ~ (fitness_j - fitness_i)
+        Shape: (number of krill, number of krill)"""
         f = self.fitness[:, None]
         f_t = self.fitness[None, :]
-        K = (f - f_t) / (self.max_fitness - self.min_fitness + EPS)
-        return K
+        if self.max_fitness - self.min_fitness < EPS:
+            return np.zeros((self.krill_count, self.krill_count))
+        K = (f - f_t) / (self.max_fitness - self.min_fitness)
+        return K.T # transpose instead of -1 multiplication
 
-    def get_X(self):
+    def get_X(self):  # output was manually checked
         """Returns matrix of krill distance-vectors.
         Result has shape (number of krill, number of krill, num of parameters).
         Example: vector from krill `i` to krill `j` is given by X[i,j,:]"""
@@ -85,27 +90,33 @@ class KrillHerd:
         for i in range(X.shape[0]): # for each krill
             x = self.positions[i, :]
             X[i] = self.positions - x
-            X[i] /= (np.linalg.norm(X[i], axis=1)[:, None] + EPS)
-        print(X.shape)
         return X
 
-    def get_X_best(self):
-        diff = self.positions - self.memory
+    def get_X_best(self): # output was manually checked
+        """Return arrays of vectors to krills' positions from their respective
+        best seen solutions. Shape: (number of krill, number of documents)"""
+        diff = self.positions - (self.memory + 0.5)  # moving solution away from the edge (floor function)
         diff_norm = np.linalg.norm(diff)
         X_best = np.multiply(1 / (diff_norm.reshape(-1, 1) + EPS), diff)
         return X_best
 
-    def get_K_best(self):
-        K_best = (self.fitness - self.best_fitness) / (self.max_fitness - self.min_fitness + EPS)
+    def get_K_best(self): # output was manually checked
+        """K_best shape: (number of krill,), values not grater than 0"""
+        if self.max_fitness - self.min_fitness < EPS:
+            return np.zeros((self.krill_count,))
+        K_best = (self.fitness - self.best_fitness) / (self.max_fitness - self.min_fitness)
         return K_best
 
-    def get_K_best_X_best(self):
+    def get_K_best_X_best(self):  # output was manually checked
+        """Returns array of scaled by K_best vectors. Vectors are direced from
+        krills' positions to their respective best solution.
+        Shape: (number of krill, number of documents)"""
         K_best = self.get_K_best()
         X_best = self.get_X_best()
         K_best_X_best = np.multiply(K_best.reshape(-1, 1), X_best)
         return K_best_X_best
 
-    def get_alpha_local(self):
+    def get_alpha_local(self):  # output was manually checked
         """Calculate alpha local for each krill. Shape: (num krill, num documents)"""
         K = self.get_K()
         X = self.get_X()
@@ -119,38 +130,45 @@ class KrillHerd:
 
         alpha_l = np.zeros((self.krill_count, self.positions.shape[1]))
         for i in range(self.krill_count):
-            distances = np.linalg.norm(self.positions[i, :] - self.positions, axis=1)
-            sensing_distance = np.sum(distances) / (self.krill_count)
-            alpha_l[i] = (K[i] * (distances < sensing_distance)) @ X[i]
+            distance_vectors = X[i]
+            distances = np.linalg.norm(distance_vectors, axis=1)
+            sensing_distance = np.mean(distances)
+            idx = distances < sensing_distance
+            alpha_l[i] = K[i, idx] @ (X[i, idx] / (np.linalg.norm(X[i, idx], axis=1)[:, None] + EPS))
         return alpha_l
 
-    def get_alpha_target(self):
+    def get_alpha_target(self):  # output was not manually checked
         """Computes alpha_target."""
         rand = self.rng.random((self.krill_count, 1))
-        C_best = -2 * (1 + rand * self.i_curr / self.i_max)
+
+        # alternative: moving away from worst krill
+        # C_best = -2 * (1 + rand * self.i_curr / self.i_max)
         # alpha_t = (worst krill - i_th krill) / (max fitness - worst fitness)
         # alpha_t = alpha_t * (worst_krill_pos - ith krill position) / ||(worst_krill_pos - ith krill position)||
 
-        C_best = 2*(self.rng.random((self.krill_count, 1)) + self.i_curr/self.i_max)
+        # moving towards best seen solution
+        C_best = 2*(rand + self.i_curr/self.i_max)
         alpha_t = np.multiply(C_best, self.K_best_X_best)
         return alpha_t
 
-    def get_food_position(self):
+    def get_food_position(self):  # output was not manually checked
         return (np.sum(np.multiply(1 / (self.fitness.reshape(-1, 1) + EPS), self.positions), axis=0)
                 / np.sum(1 / (self.fitness + EPS)))
 
-    def get_X_food(self):
+    def get_X_food(self):  # output was not manually checked
         diff = self.positions - self.food_position
         diff_norm = np.linalg.norm(diff)
         X_food = np.multiply(1 / (diff_norm.reshape(-1, 1) + EPS), diff)
         return X_food
 
-    def get_K_food(self):
+    def get_K_food(self):  # output was not manually checked
         food_fitness = self._get_fitness(self._position_to_solution(self.food_position.reshape(1, -1)))
-        K_food = (self.fitness - food_fitness) / (self.max_fitness - self.min_fitness + EPS)
+        if self.max_fitness - self.min_fitness < EPS:
+            return np.zeros((self.krill_count, ))
+        K_food = (self.fitness - food_fitness) / (self.max_fitness - self.min_fitness)
         return K_food
 
-    def get_beta_food(self):
+    def get_beta_food(self):  # output was not manually checked
         C_food = 2*(1 - self.i_curr/self.i_max)
         K_food = self.get_K_food()
         X_food = self.get_X_food()
@@ -188,7 +206,7 @@ class KrillHerd:
         # self.positions *= self.num_clusters
         # self.positions = np.clip(self.positions, 0, self.num_clusters+1)
 
-    def move_herd(self):
+    def move_herd(self):  # output was not manually checked
         # movement induced by other krill
         self.K_best_X_best = self.get_K_best_X_best()
         alpha = self.get_alpha_local() + self.get_alpha_target()
@@ -201,12 +219,13 @@ class KrillHerd:
         self.f_old = f
 
         d = self.d_max * (1 - self.i_curr / self.i_max) * self.rng.random(self.positions.shape)
-        # print(np.max(d), np.max(f), np.max(n))
-        self.positions += self.c_t * self.num_clusters * self.corpus.shape[0] * (n + f)# + d)
-        # self.positions += self.c_t * self.num_clusters * (n + f + d)
+        # log sizes of speed components
+        # print(f"{np.max(d)=}, {np.max(f)=}, {np.max(n)=}")
+        # self.positions += self.c_t * self.num_clusters * self.corpus.shape[0] * (n + d + f)
+        self.positions += self.c_t * self.num_clusters * (n + f + d)
         self.scale_positions()
 
-    def start(self, iter=1000):
+    def start(self, iter=200):
         self.i_max = iter
 
         for i in tqdm(range(iter)):
@@ -266,7 +285,7 @@ if __name__ == "__main__":
     #                    [-0.3, -0.8, 4]
     #                    ])
     from sklearn.datasets import make_blobs
-    corpus, labels = make_blobs(n_samples=10, n_features=3, centers=[[1, -1, -1], [-1, 0, 0], [0, 1, 1]])
+    corpus, labels = make_blobs(n_samples=100, n_features=3, centers=[[1, -1, -1], [-1, 0, 0], [0, 1, 1]])
 
     corpus = corpus / np.linalg.norm(corpus, axis=1)[:, None]
     idx = np.argsort(labels)
@@ -275,16 +294,16 @@ if __name__ == "__main__":
     print(corpus)
     print("corpus shape", corpus.shape)
 
-    herd = KrillHerd(3, corpus, 3) # krill num: 25
-    print("positions:\n", herd.positions)
+    herd = KrillHerd(25, corpus, 3) # krill num: 25
+    # print("positions:\n", herd.positions)
     print("memory before\n", herd.memory[:3])
-    herd.start(iter=400)
+    herd.start(iter=300)
     print("memory after\n", herd.memory[:3])
     print("best clustering\n", herd.best_clustering())
     real_classes = np.loadtxt(labels_path, delimiter='\n')
     # print(real_classes[:corpus.shape[0]])
-    print("positions:\n", herd.positions)
-    for i in range(len(herd.fitness)):
+    # print("positions:\n", herd.positions)
+    for i in range(3):
         print(herd.memory[i], herd.best_fitness[i])
     plt.plot(herd.best_fitness_history)
     plt.show()
