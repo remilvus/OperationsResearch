@@ -76,6 +76,9 @@ class KrillHerd:
         return K
 
     def get_X(self):
+        """Returns matrix of krill distance-vectors.
+        Result has shape (number of krill, number of krill, num of parameters).
+        Example: vector from krill `i` to krill `j` is given by X[i,j,:]"""
         shape = (self.positions.shape[0], self.positions.shape[0],
                  self.positions.shape[1])
         X = np.zeros(shape, dtype=np.float32)
@@ -83,6 +86,7 @@ class KrillHerd:
             x = self.positions[i, :]
             X[i] = self.positions - x
             X[i] /= (np.linalg.norm(X[i], axis=1)[:, None] + EPS)
+        print(X.shape)
         return X
 
     def get_X_best(self):
@@ -102,9 +106,16 @@ class KrillHerd:
         return K_best_X_best
 
     def get_alpha_local(self):
-        # TODO: add sensing distance
+        """Calculate alpha local for each krill. Shape: (num krill, num documents)"""
         K = self.get_K()
         X = self.get_X()
+
+        # dist_vec = vectors from i_th krill to all other
+        # dist = distance from i_th krill to all other
+        # sensing dist = mean(dist) / 5
+        # # calculated only for krill inside sensing distance
+        # alpha_l = - (fitness other - fitness i_th) / (max fitness - worst fitness) / dist other
+        # alpha_l *= dist_vec other
 
         alpha_l = np.zeros((self.krill_count, self.positions.shape[1]))
         for i in range(self.krill_count):
@@ -115,6 +126,11 @@ class KrillHerd:
 
     def get_alpha_target(self):
         """Computes alpha_target."""
+        rand = self.rng.random((self.krill_count, 1))
+        C_best = -2 * (1 + rand * self.i_curr / self.i_max)
+        # alpha_t = (worst krill - i_th krill) / (max fitness - worst fitness)
+        # alpha_t = alpha_t * (worst_krill_pos - ith krill position) / ||(worst_krill_pos - ith krill position)||
+
         C_best = 2*(self.rng.random((self.krill_count, 1)) + self.i_curr/self.i_max)
         alpha_t = np.multiply(C_best, self.K_best_X_best)
         return alpha_t
@@ -250,7 +266,7 @@ if __name__ == "__main__":
     #                    [-0.3, -0.8, 4]
     #                    ])
     from sklearn.datasets import make_blobs
-    corpus, labels = make_blobs(n_samples=100, n_features=3, centers=[[1, -1, -1], [-1, 0, 0], [0, 1, 1]])
+    corpus, labels = make_blobs(n_samples=10, n_features=3, centers=[[1, -1, -1], [-1, 0, 0], [0, 1, 1]])
 
     corpus = corpus / np.linalg.norm(corpus, axis=1)[:, None]
     idx = np.argsort(labels)
@@ -259,7 +275,7 @@ if __name__ == "__main__":
     print(corpus)
     print("corpus shape", corpus.shape)
 
-    herd = KrillHerd(25, corpus, 3)
+    herd = KrillHerd(3, corpus, 3) # krill num: 25
     print("positions:\n", herd.positions)
     print("memory before\n", herd.memory[:3])
     herd.start(iter=400)
