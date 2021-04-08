@@ -2,7 +2,7 @@ from sklearn.metrics import davies_bouldin_score, pairwise_distances_argmin
 import itertools
 import psutil
 import ray
-
+import numpy as np
 
 def idb_score(doc_by_term, chromosomes):
     """ calculate inverse davies bouldin score for each chromosome"""
@@ -36,5 +36,17 @@ def chunks(lst, n):
     chunk_size = (len(lst)+n-1)//n
     for i in range(0, len(lst), chunk_size):
         yield lst[i:i + chunk_size]
+
+
+def score_by_labels(chromosome, doc_by_term, labels):
+    assigned_centers = assign_centers_dynamic(doc_by_term, chromosome)
+    centers_labels = [labels[gene] for gene in chromosome]
+    print("centers", len(np.unique(centers_labels)), centers_labels)
+    same = 0
+    for i in range(len(assigned_centers)):
+        if labels[assigned_centers[i]] == labels[i]:
+            same += 1
+    print("accuracy by label:", same/len(assigned_centers))
+    return same/len(assigned_centers)
 
 

@@ -1,6 +1,8 @@
 import tensorflow.keras.datasets.reuters as reuters
+from sklearn.metrics import davies_bouldin_score
 
 from corpus_preparation import *
+from genetic.fitness_function import assign_centers_dynamic
 
 (x_train, y_train), (x_test, y_test) = reuters.load_data(
     path="op_lab_reuters_dataset.npz",
@@ -14,9 +16,5 @@ from corpus_preparation import *
     index_from=3,  # Index actual words with this index and higher.
 )
 reuters.get_word_index(path="reuters_word_index.json")
-corpus = generate_corpus(x_train[:4000], k=60, filename='corpus4k60.csv')
-save_corpus(y_train, "labels.csv", fmt="%i")
+corpus = generate_corpus(x_train[:3000], k=100, filename='corpus3k100.csv')
 print("corpus created")
-
-# labels = load_corpus("labels.csv", dtype=int)
-# print('labels saved')
