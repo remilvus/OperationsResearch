@@ -5,7 +5,7 @@ from genetic.fitness_function import idb_score, idb_score_multi, score_by_labels
 import numpy as np
 import ray
 from genetic.timer import Timer
-
+from heapq import nlargest
 
 class GeneticAlgorithm:
     def __init__(self, doc_by_term, labels, k_min, k_max, mutation_chance=0.01):
@@ -23,6 +23,19 @@ class GeneticAlgorithm:
             self.fitness_calculator = idb_score
 
     def init_population(self, size):
+        assert size % 4 == 0, "population size must by divisible by 4"
+        population2 = self.random_population(size*2)
+        population = self.choose_best(size, population2)
+        return population
+
+    def choose_best(self, size, population):
+        fitness = self.fitness_calculator(self.doc_by_term, population)
+        print("avg fitness: ", sum(fitness)/len(fitness))
+        best_idx = nlargest(size, range(len(fitness)), key=lambda idx: fitness[idx])
+        print("avg fitness of best half: ", sum([fitness[i] for i in best_idx])/len(best_idx))
+        return [population[i] for i in best_idx]
+
+    def random_population(self, size):
         return [self.random_chromosome() for _ in range(size)]
 
     def random_chromosome(self):
@@ -30,7 +43,6 @@ class GeneticAlgorithm:
         return np.random.choice(self.N, size=k, replace=False)
 
     def run(self, population_size=100, iterations=1000):
-        assert population_size % 4 == 0, "population size must by divisible by 4"
         population = self.init_population(population_size)
         for i in range(iterations):
             fitness = self.fitness_calculator(self.doc_by_term, population)
@@ -128,9 +140,9 @@ if __name__ == '__main__':
     labels = load_corpus("../labels.csv", dtype=int)[:len(corpus)]
     corpus, labels = choose_n_topics(10, corpus, labels)
     ga = GeneticAlgorithm(corpus, labels, 5, 11)
-    ga.run(200)
 
-# 118,  185,  272,  398,  533,  644,  667,  868,  917, 1008, 1082,
-#       1253, 1328, 1390, 1595, 1636, 1678, 1944, 1936, 2107, 2546, 2589,
-#       2739, 2775, 2827, 2905, 3220, 3270, 3392, 3447, 3774, 3761, 3910,
-#       3954, 3989
+    population = ga.init_population(500)
+    print(population[:3])
+    print(len(population))
+
+
