@@ -26,21 +26,24 @@ class KrillHerd:
         self.fitness = self._get_fitness(self.memory)
         self.best_fitness = self.fitness
         self.max_fitness = np.max(self.best_fitness)
-        self.min_fitness = np.min(self.best_fitness)
+        # self.min_fitness = np.min(self.best_fitness)
+        self.min_fitness = np.min(self.fitness)
 
         # init KH parameters
         mul = 0.1
         self.n_max = 0.1 * mul
         self.f_max = 0.3 * mul
         self.d_max = 0.0005 * mul
-        self.n_old = np.zeros(shape=(krill_count, num_docs))
-        self.f_old = np.zeros(shape=(krill_count, num_docs))
-        self.d_old = np.zeros(shape=(krill_count, num_docs))
+        self.n_old = self.rng.random((krill_count, num_docs))
+        self.f_old = self.rng.random((krill_count, num_docs))
+        self.d_old = self.rng.random((krill_count, num_docs))
         self.inertia = 0.5  # todo: set better value
         self.c_t = 1.  # speed scaling factor # todo: set better value
         self.dt = self.num_clusters / 2 # unused for now
 
         # init genetic parameters
+        self.genes_swaped = 0.2
+        self.cross_probability = 0.05
 
         # other
         self.i_max = None
@@ -58,15 +61,9 @@ class KrillHerd:
                     continue
                 cluster = self.corpus[s]
 
-                # print("-"*5)
-                # print(s)
-                # print("cluster:\n", cluster)
                 centroid = np.mean(cluster, axis=0)[:, None]
-                # print("centroid:\n", centroid)
-                # print('\n', cluster @ centroid, '\n', np.mean(cluster @ centroid))
                 f += np.mean(cluster @ centroid)
             fitness.append(f)
-            # print("F", fitness)
         return np.array(fitness) / self.num_clusters
 
     def get_K(self): # output was manually checked
@@ -233,7 +230,17 @@ class KrillHerd:
             self.move_herd()
 
             # applying KH operators on KH memory
-            # crossover and mutation
+
+            # TODO: Implement other genetic operations
+            # crossover
+            K_best = self.get_K_best()
+            cross_p = 1. + 0.5 * K_best # K_best is negative
+            cross_p /= np.sum(cross_p)
+            for k in range(self.krill_count):
+                if self.rng.random() < self.cross_probability:
+                    other_krill = self.rng.choice(self.positions, p=cross_p)
+                    cross_idx = self.rng.random((self.positions.shape[1], )) < self.genes_swaped
+                    self.positions[k, cross_idx] = other_krill[cross_idx]
 
             # update krill memory and fitness
             new_memory = self._position_to_solution(self.positions)
@@ -242,9 +249,8 @@ class KrillHerd:
             self.memory[to_update] = new_memory[to_update]
             self.best_fitness[to_update] = self.fitness[to_update]
             self.max_fitness = np.max(self.best_fitness)
-            self.min_fitness = np.min(self.best_fitness)
-
-            # TODO: Implement genetic operations
+            # self.min_fitness = np.min(self.best_fitness)
+            self.min_fitness = np.min(self.fitness)
 
             # replace the worst krill with the best solution (assumption:
             #                                       best krill = best solution)
@@ -291,7 +297,7 @@ if __name__ == "__main__":
     idx = np.argsort(labels)
     corpus = corpus[idx]
     labels = labels[idx]
-    print(corpus)
+    print(corpus[:3])
     print("corpus shape", corpus.shape)
 
     herd = KrillHerd(25, corpus, 3) # krill num: 25
