@@ -61,3 +61,16 @@ def save_corpus(corpus, filename='corpus.csv', **kwargs):
 def load_corpus(filename='corpus.csv', **kwargs):
     return np.loadtxt(filename, delimiter=',', **kwargs)
 
+def load_corpus_with_labels(corpus_filename, labels_filename, n_topics=None):
+    corpus = load_corpus(corpus_filename)
+    labels = load_corpus(labels_filename, dtype=int)[:len(corpus)]
+    if n_topics is not None:
+        return choose_n_topics(n_topics, corpus, labels)
+    return corpus, labels
+
+def choose_n_topics(n, corpus, labels):
+    idxs = np.where(labels < n)
+    return corpus[idxs], labels[idxs]
+
+
+
