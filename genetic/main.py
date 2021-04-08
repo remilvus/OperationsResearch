@@ -1,6 +1,6 @@
 import os
 import random
-from corpus_preparation import load_corpus
+from corpus_preparation import load_corpus, load_corpus_with_labels
 from genetic.fitness_function import idb_score, idb_score_multi, score_by_labels
 import numpy as np
 import ray
@@ -130,16 +130,11 @@ class GeneticAlgorithm:
         return selection_idx
 
 
-def choose_n_topics(n, corpus, labels):
-    idxs = np.where(labels < n)
-    return corpus[idxs], labels[idxs]
 
 
 if __name__ == '__main__':
-    corpus = load_corpus("../corpus3k100.csv")
-    labels = load_corpus("../labels.csv", dtype=int)[:len(corpus)]
-    corpus, labels = choose_n_topics(10, corpus, labels)
-    ga = GeneticAlgorithm(corpus, labels, 5, 11)
+    corpus, labels = load_corpus_with_labels("../corpus3k100.csv", "../labels.csv", n_topics=10)
+    ga = GeneticAlgorithm(corpus, labels, 5, 10)
 
     population = ga.init_population(500)
     print(population[:3])
