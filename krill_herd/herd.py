@@ -46,7 +46,7 @@ class KrillHerd:
         self.n_old = self.rng.random((krill_count, num_docs))
         self.f_old = self.rng.random((krill_count, num_docs))
         self.d_old = self.rng.random((krill_count, num_docs))
-        self.inertia = 0.5 
+        self.inertia = 0.5
         self.c_t = 1.  # speed scaling factor
 
         # init genetic parameters
@@ -205,7 +205,7 @@ class KrillHerd:
         self.positions /= np.max(self.positions, axis=1, keepdims=True)
         self.positions *= self.num_clusters
 
-        # self.positions = np.clip(self.positions, 0, self.num_clusters+1)
+        # self.positions = np.clip(self.positions, 0, self.num_clusters-EPS)
 
     def move_herd(self):
         # movement induced by other krill
