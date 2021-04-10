@@ -15,6 +15,8 @@ class KrillHerd:
         self.num_clusters = num_clusters
         self.krill_count = krill_count
         self.best_fitness_history = []
+        self.speed_history = []
+        self.sensing_history = []
 
         # keeps current krill's positions
         self.positions = self.rng.random(
@@ -44,6 +46,7 @@ class KrillHerd:
         # init genetic parameters
         self.genes_swaped = 0.2
         self.cross_probability = 0.05
+        self.mutation_base = 0.05
 
         # other
         self.i_max = None
@@ -76,7 +79,7 @@ class KrillHerd:
         if self.max_fitness - self.min_fitness < EPS:
             return np.zeros((self.krill_count, self.krill_count))
         K = (f - f_t) / (self.max_fitness - self.min_fitness)
-        return K.T # transpose instead of -1 multiplication
+        return K.T  # transpose instead of -1 multiplication
 
     def get_X(self):  # output was manually checked
         """Returns matrix of krill distance-vectors.
@@ -119,19 +122,13 @@ class KrillHerd:
         K = self.get_K()
         X = self.get_X()
 
-        # dist_vec = vectors from i_th krill to all other
-        # dist = distance from i_th krill to all other
-        # sensing dist = mean(dist) / 5
-        # # calculated only for krill inside sensing distance
-        # alpha_l = - (fitness other - fitness i_th) / (max fitness - worst fitness) / dist other
-        # alpha_l *= dist_vec other
-
         alpha_l = np.zeros((self.krill_count, self.positions.shape[1]))
         for i in range(self.krill_count):
             distance_vectors = X[i]
             distances = np.linalg.norm(distance_vectors, axis=1)
             sensing_distance = np.mean(distances)
             idx = distances < sensing_distance
+            self.sensing_history.append(np.sum(idx))
             alpha_l[i] = K[i, idx] @ (X[i, idx] / (np.linalg.norm(X[i, idx], axis=1)[:, None] + EPS))
         return alpha_l
 
@@ -185,7 +182,6 @@ class KrillHerd:
         best_krill = np.argmax(self.best_fitness)
         return self.positions[best_krill]
 
-
     def best_clustering(self):
         """Returns clustering obtained by the most fit krill. Assumes that self.best_fitness
         and self.memory are regularly updated."""
@@ -221,12 +217,15 @@ class KrillHerd:
 
         d = self.d_max * (1 - self.i_curr / self.i_max) * self.rng.random(self.positions.shape)
         # log sizes of speed components
-        # print(f"{np.max(d)=}, {np.max(f)=}, {np.max(n)=}")
         # self.positions += self.c_t * self.num_clusters * self.corpus.shape[0] * (n + d + f)
         self.positions += self.c_t * self.num_clusters * (n + f + d)
+
+        self.speed_history.append((np.linalg.norm(n),
+                                   np.linalg.norm(f),
+                                   np.linalg.norm(d)))
         self.scale_positions()
 
-    def start(self, iter=200):
+    def start(self, iter=100):
         self.i_max = iter
 
         for i in tqdm(range(iter)):
@@ -235,16 +234,24 @@ class KrillHerd:
 
             # applying KH operators on KH memory
 
-            # TODO: Implement other genetic operations
-            # crossover
-            K_best = self.get_K_best()
-            cross_p = 1. + 0.5 * K_best # K_best is negative
+            # crossover and mutation
+            K = (self.fitness - self.max_fitness) / (
+                        self.max_fitness - self.min_fitness)
+
+            cross_p = 1. + 0.5 * K  # K is negative
             cross_p /= np.sum(cross_p)
             for k in range(self.krill_count):
                 if self.rng.random() < self.cross_probability:
-                    other_krill = self.rng.choice(self.positions, p=cross_p)
+                    other_idx = self.rng.choice(np.arange(0, self.krill_count), p=cross_p)
                     cross_idx = self.rng.random((self.positions.shape[1], )) < self.genes_swaped
-                    self.positions[k, cross_idx] = other_krill[cross_idx]
+                    # crossover
+                    position_tmp = self.positions[k, cross_idx]
+                    self.positions[k, cross_idx] = self.positions[other_idx, cross_idx]
+                    self.positions[other_idx, cross_idx] = position_tmp
+                    # mutation
+                    mu = self.mutation_base / self.fitness[k]
+                    mutation_idx = self.rng.random((self.positions.shape[1], )) < mu
+                    self.positions[k, mutation_idx] = self.rng.random((np.sum(mutation_idx, ))) * self.num_clusters
 
             # update krill memory and fitness
             new_memory = self._position_to_solution(self.positions)
@@ -252,8 +259,7 @@ class KrillHerd:
             to_update = self.fitness > self.best_fitness
             self.memory[to_update] = new_memory[to_update]
             self.best_fitness[to_update] = self.fitness[to_update]
-            self.max_fitness = np.max(self.best_fitness)
-            # self.min_fitness = np.min(self.best_fitness)
+            self.max_fitness = np.max(self.fitness)
             self.min_fitness = np.min(self.fitness)
 
             # replace the worst krill with the best solution (assumption:
@@ -274,6 +280,36 @@ class KrillHerd:
     @staticmethod
     def _position_to_solution(positions):
         return np.floor(positions)
+
+
+def visualise_process(herd: KrillHerd):
+    plt.plot(herd.best_fitness_history)
+    plt.xlabel("iteration")
+    plt.ylabel("best fitness")
+    plt.show()
+
+    plt.hist(herd.sensing_history, bins=20)
+    plt.xlabel("Number of krill inside sensing distance")
+    plt.show()
+
+    plt.plot(list(map(lambda x: x[1], herd.speed_history)), label="f")
+    # plt.xlabel("iteration")
+    # plt.ylabel("speed")
+    # plt.legend()
+    # plt.show()
+
+    plt.plot(list(map(lambda x: x[0], herd.speed_history)), label="n")
+    plt.xlabel("iteration")
+    plt.ylabel("speed")
+    plt.yscale("log")
+    plt.legend()
+    plt.show()
+
+    plt.plot(list(map(lambda x: x[2], herd.speed_history)), label="d")
+    plt.xlabel("iteration")
+    plt.ylabel("speed")
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -311,10 +347,9 @@ if __name__ == "__main__":
     print("memory after\n", herd.memory[:3])
     print("best clustering\n", herd.best_clustering())
     real_classes = np.loadtxt(labels_path, delimiter='\n')
-    # print(real_classes[:corpus.shape[0]])
-    # print("positions:\n", herd.positions)
+
     for i in range(3):
         print(herd.memory[i], herd.best_fitness[i])
-    plt.plot(herd.best_fitness_history)
-    plt.show()
+
+    visualise_process(herd)
     print(labels)
