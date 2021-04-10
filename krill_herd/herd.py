@@ -51,6 +51,7 @@ class KrillHerd:
         self.food_position = None
         self.K_best_X_best = None
 
+
     def _get_fitness(self, solution):
         fitness = []
         for j in range(solution.shape[0]):
@@ -134,7 +135,7 @@ class KrillHerd:
             alpha_l[i] = K[i, idx] @ (X[i, idx] / (np.linalg.norm(X[i, idx], axis=1)[:, None] + EPS))
         return alpha_l
 
-    def get_alpha_target(self):  # output was not manually checked
+    def get_alpha_target(self):  # output was manually checked
         """Computes alpha_target."""
         rand = self.rng.random((self.krill_count, 1))
 
@@ -148,9 +149,12 @@ class KrillHerd:
         alpha_t = np.multiply(C_best, self.K_best_X_best)
         return alpha_t
 
-    def get_food_position(self):  # output was not manually checked
-        return (np.sum(np.multiply(1 / (self.fitness.reshape(-1, 1) + EPS), self.positions), axis=0)
-                / np.sum(1 / (self.fitness + EPS)))
+    def get_food_position(self):  # output was manually checked
+        #food_position = (np.sum(np.multiply(1 / (self.fitness.reshape(-1, 1) + EPS), self.positions), axis=0)
+        #         / np.sum(1 / (self.fitness + EPS)))
+        food_position = (np.sum(np.multiply(self.fitness.reshape(-1, 1), self.positions), axis=0)
+                 / np.sum(self.fitness))
+        return food_position
 
     def get_X_food(self):  # output was not manually checked
         diff = self.positions - self.food_position
@@ -303,7 +307,7 @@ if __name__ == "__main__":
     herd = KrillHerd(25, corpus, 3) # krill num: 25
     # print("positions:\n", herd.positions)
     print("memory before\n", herd.memory[:3])
-    herd.start(iter=300)
+    herd.start(iter=10000)
     print("memory after\n", herd.memory[:3])
     print("best clustering\n", herd.best_clustering())
     real_classes = np.loadtxt(labels_path, delimiter='\n')
