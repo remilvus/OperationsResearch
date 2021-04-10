@@ -238,8 +238,11 @@ class KrillHerd:
             # applying KH operators on KH memory
 
             # crossover and mutation
-            K = (self.fitness - self.max_fitness) / (
-                        self.max_fitness - self.min_fitness)
+            if (self.max_fitness - self.min_fitness) < EPS:
+                K = np.zeros((self.krill_count, ))
+            else:
+                K = (self.fitness - self.max_fitness) / (
+                            self.max_fitness - self.min_fitness)
 
             cross_p = 1. + 0.5 * K  # K is negative
             cross_p /= np.sum(cross_p)
@@ -285,7 +288,10 @@ class KrillHerd:
 
 
 def visualise_process(herd: KrillHerd):
-    plt.plot(herd.best_fitness_history)
+    def moving_average(x, w):
+        return np.convolve(x, np.ones(w), 'valid') / w
+    fitness = moving_average(herd.best_fitness_history, 3)
+    plt.plot(fitness)
     plt.xlabel("iteration")
     plt.ylabel("best fitness")
     plt.show()
