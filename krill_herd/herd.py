@@ -46,6 +46,7 @@ class KrillHerd:
         # init genetic parameters
         self.genes_swaped = 0.2
         self.cross_probability = 0.05
+        self.mutation_base = 0.05
 
         # other
         self.i_max = None
@@ -177,7 +178,6 @@ class KrillHerd:
         best_krill = np.argmax(self.best_fitness)
         return self.positions[best_krill]
 
-
     def best_clustering(self):
         """Returns clustering obtained by the most fit krill. Assumes that self.best_fitness
         and self.memory are regularly updated."""
@@ -213,7 +213,6 @@ class KrillHerd:
 
         d = self.d_max * (1 - self.i_curr / self.i_max) * self.rng.random(self.positions.shape)
         # log sizes of speed components
-        # print(f"{np.max(d)=}, {np.max(f)=}, {np.max(n)=}")
         # self.positions += self.c_t * self.num_clusters * self.corpus.shape[0] * (n + d + f)
         self.positions += self.c_t * self.num_clusters * (n + f + d)
 
@@ -222,7 +221,7 @@ class KrillHerd:
                                    np.linalg.norm(d)))
         self.scale_positions()
 
-    def start(self, iter=200):
+    def start(self, iter=100):
         self.i_max = iter
 
         for i in tqdm(range(iter)):
@@ -231,18 +230,24 @@ class KrillHerd:
 
             # applying KH operators on KH memory
 
-            # TODO: Implement other genetic operations
-            # crossover
-            K_best = self.get_K_best()
-            cross_p = 1. + 0.5 * K_best # K_best is negative
+            # crossover and mutation
+            K = (self.fitness - self.max_fitness) / (
+                        self.max_fitness - self.min_fitness)
+
+            cross_p = 1. + 0.5 * K  # K is negative
             cross_p /= np.sum(cross_p)
             for k in range(self.krill_count):
                 if self.rng.random() < self.cross_probability:
                     other_idx = self.rng.choice(np.arange(0, self.krill_count), p=cross_p)
                     cross_idx = self.rng.random((self.positions.shape[1], )) < self.genes_swaped
+                    # crossover
                     position_tmp = self.positions[k, cross_idx]
                     self.positions[k, cross_idx] = self.positions[other_idx, cross_idx]
                     self.positions[other_idx, cross_idx] = position_tmp
+                    # mutation
+                    mu = self.mutation_base / self.fitness[k]
+                    mutation_idx = self.rng.random((self.positions.shape[1], )) < mu
+                    self.positions[k, mutation_idx] = self.rng.random((np.sum(mutation_idx, ))) * self.num_clusters
 
             # update krill memory and fitness
             new_memory = self._position_to_solution(self.positions)
@@ -250,8 +255,7 @@ class KrillHerd:
             to_update = self.fitness > self.best_fitness
             self.memory[to_update] = new_memory[to_update]
             self.best_fitness[to_update] = self.fitness[to_update]
-            self.max_fitness = np.max(self.best_fitness)
-            # self.min_fitness = np.min(self.best_fitness)
+            self.max_fitness = np.max(self.fitness)
             self.min_fitness = np.min(self.fitness)
 
             # replace the worst krill with the best solution (assumption:
@@ -335,12 +339,11 @@ if __name__ == "__main__":
     herd = KrillHerd(25, corpus, 3) # krill num: 25
     # print("positions:\n", herd.positions)
     print("memory before\n", herd.memory[:3])
-    herd.start(iter=300)
+    herd.start(iter=3000)
     print("memory after\n", herd.memory[:3])
     print("best clustering\n", herd.best_clustering())
     real_classes = np.loadtxt(labels_path, delimiter='\n')
-    # print(real_classes[:corpus.shape[0]])
-    # print("positions:\n", herd.positions)
+
     for i in range(3):
         print(herd.memory[i], herd.best_fitness[i])
 
