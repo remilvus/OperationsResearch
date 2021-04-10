@@ -54,7 +54,6 @@ class KrillHerd:
         self.food_position = None
         self.K_best_X_best = None
 
-
     def _get_fitness(self, solution):
         fitness = []
         for j in range(solution.shape[0]):
@@ -63,9 +62,10 @@ class KrillHerd:
                 s = solution[j, :] == i
                 if not np.any(s):
                     continue
-                cluster = self.corpus[s]
+                cluster = self.corpus[s] / (np.linalg.norm(self.corpus[s], axis=1)[:, None] + EPS)
 
                 centroid = np.mean(cluster, axis=0)[:, None]
+                centroid /= (np.linalg.norm(centroid) + EPS)
                 f += np.mean(cluster @ centroid)
             fitness.append(f)
         return np.array(fitness) / self.num_clusters
@@ -276,7 +276,6 @@ class KrillHerd:
 
             self.best_fitness_history.append(self.fitness[best_krill])
 
-
     @staticmethod
     def _position_to_solution(positions):
         return np.floor(positions)
@@ -293,11 +292,6 @@ def visualise_process(herd: KrillHerd):
     plt.show()
 
     plt.plot(list(map(lambda x: x[1], herd.speed_history)), label="f")
-    # plt.xlabel("iteration")
-    # plt.ylabel("speed")
-    # plt.legend()
-    # plt.show()
-
     plt.plot(list(map(lambda x: x[0], herd.speed_history)), label="n")
     plt.xlabel("iteration")
     plt.ylabel("speed")
@@ -331,7 +325,7 @@ if __name__ == "__main__":
     #                    [-0.3, -0.8, 4]
     #                    ])
     from sklearn.datasets import make_blobs
-    corpus, labels = make_blobs(n_samples=100, n_features=3, centers=[[1, -1, -1], [-1, 0, 0], [0, 1, 1]])
+    corpus, labels = make_blobs(n_samples=100, n_features=3, centers=[[0, 1, 1], [1, -1, -1], [-1, 0, 0]])
 
     corpus = corpus / np.linalg.norm(corpus, axis=1)[:, None]
     idx = np.argsort(labels)
@@ -343,7 +337,7 @@ if __name__ == "__main__":
     herd = KrillHerd(25, corpus, 3) # krill num: 25
     # print("positions:\n", herd.positions)
     print("memory before\n", herd.memory[:3])
-    herd.start(iter=10000)
+    herd.start(iter=300)
     print("memory after\n", herd.memory[:3])
     print("best clustering\n", herd.best_clustering())
     real_classes = np.loadtxt(labels_path, delimiter='\n')
