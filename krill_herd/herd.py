@@ -151,6 +151,8 @@ class KrillHerd:
         #         / np.sum(1 / (self.fitness + EPS)))
         food_position = (np.sum(np.multiply(self.fitness.reshape(-1, 1), self.positions), axis=0)
                  / np.sum(self.fitness))
+        # global labels
+        # return labels
         return food_position
 
     def get_X_food(self):  # output was not manually checked
@@ -194,9 +196,10 @@ class KrillHerd:
         for i in range(self.positions.shape[1]):
             too_big = self.positions[:, i] >= self.num_clusters
             too_small = self.positions[:, i] < 0
-            rand = self.rng.random()
-            self.positions[too_small, i] = rand * self.memory[too_small, i]
-            self.positions[too_big, i] = rand * self.memory[too_big, i] + (1 - rand) * self.num_clusters
+            rand_small = self.rng.random(np.sum(too_small))
+            rand_big = self.rng.random(np.sum(too_big))
+            self.positions[too_small, i] = self.rng.random(np.sum(too_small)) * self.memory[too_small, i]
+            self.positions[too_big, i] = rand_big * self.memory[too_big, i] + (1 - rand_big) * self.num_clusters
 
         # self.positions -= np.min(self.positions, axis=1, keepdims=True)
         # self.positions /= np.max(self.positions, axis=1, keepdims=True)
@@ -337,7 +340,7 @@ if __name__ == "__main__":
     herd = KrillHerd(25, corpus, 3) # krill num: 25
     # print("positions:\n", herd.positions)
     print("memory before\n", herd.memory[:3])
-    herd.start(iter=300)
+    herd.start(iter=3000)
     print("memory after\n", herd.memory[:3])
     print("best clustering\n", herd.best_clustering())
     real_classes = np.loadtxt(labels_path, delimiter='\n')
