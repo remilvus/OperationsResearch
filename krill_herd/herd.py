@@ -3,6 +3,7 @@ import numpy as np
 import pathlib
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
 
 EPS = 1e-8
 
@@ -18,6 +19,12 @@ class KrillHerd:
         self.speed_history = []
         self.sensing_history = []
 
+        # initial solution from k-means
+        # kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(corpus)
+        # print("KMEANS fitness ", self._get_fitness(kmeans.labels_[None, :]))
+        # self.positions = 2 * (self.rng.random(size=(krill_count, num_docs)) - 0.5) + kmeans.labels_
+        # self.positions = np.clip(self.positions, 0, num_clusters - EPS)
+
         # keeps current krill's positions
         self.positions = self.rng.random(
             size=(krill_count, num_docs)) * num_clusters
@@ -32,21 +39,20 @@ class KrillHerd:
         self.min_fitness = np.min(self.fitness)
 
         # init KH parameters
-        mul = 0.1
+        mul = 1.
         self.n_max = 0.1 * mul
-        self.f_max = 0.3 * mul
-        self.d_max = 0.0005 * mul
+        self.f_max = 0.03 * mul
+        self.d_max = 0.008 * mul
         self.n_old = self.rng.random((krill_count, num_docs))
         self.f_old = self.rng.random((krill_count, num_docs))
         self.d_old = self.rng.random((krill_count, num_docs))
-        self.inertia = 0.5  # todo: set better value
-        self.c_t = 1.  # speed scaling factor # todo: set better value
-        self.dt = self.num_clusters / 2 # unused for now
+        self.inertia = 0.5 
+        self.c_t = 1.  # speed scaling factor
 
         # init genetic parameters
         self.genes_swaped = 0.2
-        self.cross_probability = 0.05
-        self.mutation_base = 0.05
+        self.cross_probability = 0.1
+        self.mutation_base = 0.02
 
         # other
         self.i_max = None
@@ -70,7 +76,7 @@ class KrillHerd:
             fitness.append(f)
         return np.array(fitness) / self.num_clusters
 
-    def get_K(self): # output was manually checked
+    def get_K(self):
         """Matrix of normalised fitness difference.
         K[i, j] ~ (fitness_j - fitness_i)
         Shape: (number of krill, number of krill)"""
@@ -81,7 +87,7 @@ class KrillHerd:
         K = (f - f_t) / (self.max_fitness - self.min_fitness)
         return K.T  # transpose instead of -1 multiplication
 
-    def get_X(self):  # output was manually checked
+    def get_X(self):
         """Returns matrix of krill distance-vectors.
         Result has shape (number of krill, number of krill, num of parameters).
         Example: vector from krill `i` to krill `j` is given by X[i,j,:]"""
@@ -108,7 +114,7 @@ class KrillHerd:
         K_best = (self.fitness - self.best_fitness) / (self.max_fitness - self.min_fitness)
         return K_best
 
-    def get_K_best_X_best(self):  # output was manually checked
+    def get_K_best_X_best(self):
         """Returns array of scaled by K_best vectors. Vectors are direced from
         krills' positions to their respective best solution.
         Shape: (number of krill, number of documents)"""
@@ -117,7 +123,7 @@ class KrillHerd:
         K_best_X_best = np.multiply(K_best.reshape(-1, 1), X_best)
         return K_best_X_best
 
-    def get_alpha_local(self):  # output was manually checked
+    def get_alpha_local(self):
         """Calculate alpha local for each krill. Shape: (num krill, num documents)"""
         K = self.get_K()
         X = self.get_X()
@@ -132,21 +138,16 @@ class KrillHerd:
             alpha_l[i] = K[i, idx] @ (X[i, idx] / (np.linalg.norm(X[i, idx], axis=1)[:, None] + EPS))
         return alpha_l
 
-    def get_alpha_target(self):  # output was manually checked
+    def get_alpha_target(self):
         """Computes alpha_target."""
         rand = self.rng.random((self.krill_count, 1))
-
-        # alternative: moving away from worst krill
-        # C_best = -2 * (1 + rand * self.i_curr / self.i_max)
-        # alpha_t = (worst krill - i_th krill) / (max fitness - worst fitness)
-        # alpha_t = alpha_t * (worst_krill_pos - ith krill position) / ||(worst_krill_pos - ith krill position)||
 
         # moving towards best seen solution
         C_best = 2*(rand + self.i_curr/self.i_max)
         alpha_t = np.multiply(C_best, self.K_best_X_best)
         return alpha_t
 
-    def get_food_position(self):  # output was manually checked
+    def get_food_position(self):
         #food_position = (np.sum(np.multiply(1 / (self.fitness.reshape(-1, 1) + EPS), self.positions), axis=0)
         #         / np.sum(1 / (self.fitness + EPS)))
         food_position = (np.sum(np.multiply(self.fitness.reshape(-1, 1), self.positions), axis=0)
@@ -155,20 +156,20 @@ class KrillHerd:
         # return labels
         return food_position
 
-    def get_X_food(self):  # output was not manually checked
+    def get_X_food(self):
         diff = self.positions - self.food_position
         diff_norm = np.linalg.norm(diff)
         X_food = np.multiply(1 / (diff_norm.reshape(-1, 1) + EPS), diff)
         return X_food
 
-    def get_K_food(self):  # output was not manually checked
+    def get_K_food(self):
         food_fitness = self._get_fitness(self._position_to_solution(self.food_position.reshape(1, -1)))
         if self.max_fitness - self.min_fitness < EPS:
             return np.zeros((self.krill_count, ))
         K_food = (self.fitness - food_fitness) / (self.max_fitness - self.min_fitness)
         return K_food
 
-    def get_beta_food(self):  # output was not manually checked
+    def get_beta_food(self):
         C_food = 2*(1 - self.i_curr/self.i_max)
         K_food = self.get_K_food()
         X_food = self.get_X_food()
@@ -192,21 +193,21 @@ class KrillHerd:
 
     def scale_positions(self):
         """Scales krill positions."""
-        # TODO: try different approaches (?)
-        for i in range(self.positions.shape[1]):
-            too_big = self.positions[:, i] >= self.num_clusters
-            too_small = self.positions[:, i] < 0
-            rand_small = self.rng.random(np.sum(too_small))
-            rand_big = self.rng.random(np.sum(too_big))
-            self.positions[too_small, i] = self.rng.random(np.sum(too_small)) * self.memory[too_small, i]
-            self.positions[too_big, i] = rand_big * self.memory[too_big, i] + (1 - rand_big) * self.num_clusters
+        # for i in range(self.positions.shape[1]):
+        #     too_big = self.positions[:, i] >= self.num_clusters
+        #     too_small = self.positions[:, i] < 0
+        #     rand_small = self.rng.random(np.sum(too_small))
+        #     rand_big = self.rng.random(np.sum(too_big))
+        #     self.positions[too_small, i] = self.rng.random(np.sum(too_small)) * self.memory[too_small, i]
+        #     self.positions[too_big, i] = rand_big * self.memory[too_big, i] + (1 - rand_big) * self.num_clusters
 
-        # self.positions -= np.min(self.positions, axis=1, keepdims=True)
-        # self.positions /= np.max(self.positions, axis=1, keepdims=True)
-        # self.positions *= self.num_clusters
+        self.positions -= np.min(self.positions, axis=1, keepdims=True)
+        self.positions /= np.max(self.positions, axis=1, keepdims=True)
+        self.positions *= self.num_clusters
+
         # self.positions = np.clip(self.positions, 0, self.num_clusters+1)
 
-    def move_herd(self):  # output was not manually checked
+    def move_herd(self):
         # movement induced by other krill
         self.K_best_X_best = self.get_K_best_X_best()
         alpha = self.get_alpha_local() + self.get_alpha_target()
@@ -220,7 +221,6 @@ class KrillHerd:
 
         d = self.d_max * (1 - self.i_curr / self.i_max) * self.rng.random(self.positions.shape)
         # log sizes of speed components
-        # self.positions += self.c_t * self.num_clusters * self.corpus.shape[0] * (n + d + f)
         self.positions += self.c_t * self.num_clusters * (n + f + d)
 
         self.speed_history.append((np.linalg.norm(n),
@@ -231,7 +231,8 @@ class KrillHerd:
     def start(self, iter=100):
         self.i_max = iter
 
-        for i in tqdm(range(iter)):
+        bar = tqdm(range(iter))
+        for i in bar:
             self.i_curr = i
             self.move_herd()
 
@@ -277,10 +278,8 @@ class KrillHerd:
             # self.f_old[worst_krill, :] = self.f_old[best_krill]
             # self.d_old[worst_krill, :] = self.d_old[best_krill]
 
-            if i % 100 == 0:
-                print("best fitness:", self.fitness[best_krill])
-
             self.best_fitness_history.append(self.fitness[best_krill])
+            bar.set_description(f"best fitness = {np.max(self.fitness)}")
 
     @staticmethod
     def _position_to_solution(positions):
@@ -290,10 +289,10 @@ class KrillHerd:
 def visualise_process(herd: KrillHerd):
     def moving_average(x, w):
         return np.convolve(x, np.ones(w), 'valid') / w
-    fitness = moving_average(herd.best_fitness_history, 3)
+    fitness = moving_average(herd.best_fitness_history, 50)
     plt.plot(fitness)
-    plt.xlabel("iteration")
-    plt.ylabel("best fitness")
+    plt.xlabel("numer iteracji")
+    plt.ylabel("maksymalny 'fitness'")
     plt.show()
 
     plt.hist(herd.sensing_history, bins=20)
@@ -315,44 +314,60 @@ def visualise_process(herd: KrillHerd):
     plt.show()
 
 
-if __name__ == "__main__":
+def get_corpus_subset(DOCUMENTS, REAL_CLUSTERS):
     corpus_path = pathlib.Path("..").joinpath("corpus4k60.csv")
     labels_path = pathlib.Path("..").joinpath("labels.csv")
-    corpus = load_corpus(corpus_path)#[:100, :]
-    # corpus = np.array([[0, 1, 0],
-    #                    [-0.1, 1, 0],
-    #                    [1., -0.1, 0],
-    #                    [1., 0, 0],
-    #                    [1., -0.2, 0],
-    #                    [-0.5, -0.5, 0],
-    #                    [-0.5, -0.7, 0],
-    #                    [-0.3, -0.8, 0],
-    #                    [1., 0, 4],
-    #                    [1., -0.2, 4],
-    #                    [-0.5, -0.5, 4],
-    #                    [-0.5, -0.7, 4],
-    #                    [-0.3, -0.8, 4]
-    #                    ])
+    corpus = load_corpus(corpus_path)
+    labels = np.loadtxt(labels_path, delimiter='\n')[:4000]
+    idx = np.logical_and(labels > 0, labels < (REAL_CLUSTERS + 1))
+
+    corpus = corpus[idx, :]
+    labels = labels[idx]
+
+    freq = np.zeros(corpus.shape[0])
+    for i in range(1, 1 + REAL_CLUSTERS):
+        freq[i == labels] = np.sum(i == labels) / len(labels)
+    p = 1 / freq
+    p /= np.sum(p)
+    idx_document = np.random.choice(np.arange(0, len(corpus)), p=p,
+                                    size=DOCUMENTS, replace=False)
+    corpus = corpus[idx_document, :]
+    labels = labels[idx_document]
+    return corpus, labels - 1
+
+
+def get_blobs():
     from sklearn.datasets import make_blobs
     corpus, labels = make_blobs(n_samples=100, n_features=3, centers=[[0, 1, 1], [1, -1, -1], [-1, 0, 0]])
-
     corpus = corpus / np.linalg.norm(corpus, axis=1)[:, None]
+    return corpus, labels
+
+
+if __name__ == "__main__":
+    DOCUMENTS = 50
+    REAL_CLUSTERS = 3
+    KRILL_CLUSTERS = REAL_CLUSTERS
+    KRILL_COUNT = 25
+    ITERS = 2500
+
+    corpus, labels = get_corpus_subset(DOCUMENTS, REAL_CLUSTERS)
+
+    # corpus, labels = get_blobs()
+
     idx = np.argsort(labels)
     corpus = corpus[idx]
     labels = labels[idx]
-    print(corpus[:3])
-    print("corpus shape", corpus.shape)
+    # print(corpus[:3])
+    print("Corpus shape:", corpus.shape)
 
-    herd = KrillHerd(25, corpus, 3) # krill num: 25
-    # print("positions:\n", herd.positions)
-    print("memory before\n", herd.memory[:3])
-    herd.start(iter=3000)
-    print("memory after\n", herd.memory[:3])
-    print("best clustering\n", herd.best_clustering())
-    real_classes = np.loadtxt(labels_path, delimiter='\n')
+    herd = KrillHerd(KRILL_COUNT, corpus, KRILL_CLUSTERS)
+    # print("memory before\n", herd.memory[0])
+    herd.start(iter=ITERS)
+    # print("memory after\n", herd.memory[0])
+    print("Best clustering\n", herd.best_clustering())
 
-    for i in range(3):
-        print(herd.memory[i], herd.best_fitness[i])
+    # for i in range(3):
+    #     print(herd.memory[i], herd.best_fitness[i])
 
     visualise_process(herd)
-    print(labels)
+    print("Correct labels:\n", labels)
