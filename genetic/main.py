@@ -30,9 +30,9 @@ class GeneticAlgorithm:
 
     def choose_best(self, size, population):
         fitness = self.fitness_calculator(self.doc_by_term, population)
-        print("avg fitness: ", sum(fitness)/len(fitness))
+        print("avg fitness of initial population: ", sum(fitness)/len(fitness))
         best_idx = nlargest(size, range(len(fitness)), key=lambda idx: fitness[idx])
-        print("avg fitness of best half: ", sum([fitness[i] for i in best_idx])/len(best_idx))
+        print(f"avg fitness of best {size}: ", sum([fitness[i] for i in best_idx])/len(best_idx))
         return [population[i] for i in best_idx]
 
     def random_population(self, size):
@@ -42,21 +42,23 @@ class GeneticAlgorithm:
         k = random.randint(self.k_min, self.k_max)
         return np.random.choice(self.N, size=k, replace=False)
 
-    def run(self, population_size=100, iterations=1000):
+    def run(self, population_size=300, iterations=1000):
         population = self.init_population(population_size)
+        fitness = self.fitness_calculator(self.doc_by_term, population)
         for i in range(iterations):
-            fitness = self.fitness_calculator(self.doc_by_term, population)
             if i % 10 == 0:
                 self.stats(population, fitness)
             # parents selection
-            parents = self.SUS(population, population_size // 2, fitness)
+            parents, _fitness = self.SUS(population, population_size // 2, fitness)
             # children creation (with point crossover)
             children = self.get_children(parents)
-            # survivor selection
-            # population = parents + children
-            population = self.SUS(population+children, population_size)
             # mutations
             self.mutate_all(population)
+            # survivor selection
+            # population = parents + children
+            population = population+children
+            fitness = self.fitness_calculator(self.doc_by_term, population)
+            population, fitness = self.SUS(population, population_size, fitness)
 
     def stats(self, population, fitness):
         self.timer.stop("iter")
@@ -65,7 +67,7 @@ class GeneticAlgorithm:
         print(f"max_fit: at {max_fit_idx}, fitness {fitness[max_fit_idx]}, genes {population[max_fit_idx]}")
         score_by_labels(population[max_fit_idx], self.doc_by_term, self.labels)
 
-    def SUS(self, population, size, fitness=None) -> list:
+    def SUS(self, population, size, fitness=None):
         """ stochastic universal sampling """
         if fitness is None:
             fitness = self.fitness_calculator(self.doc_by_term, population)
@@ -74,6 +76,7 @@ class GeneticAlgorithm:
         start_pointer = random.uniform(0, pointers_dist)
         pointers = [start_pointer + i * pointers_dist for i in range(size)]
         chosen = []
+        chosen_fitness = []
         curr_sum = fitness[0]
         i = 0
         for point in pointers:
@@ -81,7 +84,8 @@ class GeneticAlgorithm:
                 i += 1
                 curr_sum += fitness[i]
             chosen.append(population[i])
-        return chosen
+            chosen_fitness.append(fitness[i])
+        return chosen, chosen_fitness
 
     def get_children(self, all_parents) -> list:
         children = []
@@ -130,14 +134,10 @@ class GeneticAlgorithm:
         return selection_idx
 
 
-
-
 if __name__ == '__main__':
-    corpus, labels = load_corpus_with_labels("../corpus3k100.csv", "../labels.csv", n_topics=10)
-    ga = GeneticAlgorithm(corpus, labels, 5, 10)
+    corpus, labels = load_corpus_with_labels("../corpusTest.csv", "../labels.csv", n_topics=5)
+    print(len(corpus))
+    ga = GeneticAlgorithm(corpus, labels, 4, 8)
 
-    population = ga.init_population(500)
-    print(population[:3])
-    print(len(population))
-
+    ga.run()
 

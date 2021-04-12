@@ -62,15 +62,21 @@ def load_corpus(filename='corpus.csv', **kwargs):
     return np.loadtxt(filename, delimiter=',', **kwargs)
 
 def load_corpus_with_labels(corpus_filename, labels_filename, n_topics=None):
+    """ returns corpus: doc_by_term matrix (n,m) and labels for for each doc (n) """
     corpus = load_corpus(corpus_filename)
     labels = load_corpus(labels_filename, dtype=int)[:len(corpus)]
     if n_topics is not None:
         return choose_n_topics(n_topics, corpus, labels)
     return corpus, labels
 
-def choose_n_topics(n, corpus, labels):
-    idxs = np.where(labels < n)
-    return corpus[idxs], labels[idxs]
+def choose_n_topics(n: int, corpus: np.ndarray, labels: np.ndarray):
+    """ finds n most frequent topics and returns corpus and labels about only those n topics. """
+    topics, counts = np.unique(labels, return_counts=True)
+    popular_idx = np.argsort(counts)[-n:]
+    chosen_topics = topics[popular_idx]
+    mask = np.isin(labels, chosen_topics)
+    return corpus[mask], labels[mask]
+
 
 
 
