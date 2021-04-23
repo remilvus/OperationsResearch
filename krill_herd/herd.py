@@ -350,9 +350,9 @@ if __name__ == "__main__":
     KRILL_COUNT = 25
     ITERS = 2500
 
-    corpus, labels = get_corpus_subset(DOCUMENTS, REAL_CLUSTERS)
+    # corpus, labels = get_corpus_subset(DOCUMENTS, REAL_CLUSTERS)
 
-    # corpus, labels = get_blobs()
+    corpus, labels = get_blobs()
 
     idx = np.argsort(labels)
     corpus = corpus[idx]
