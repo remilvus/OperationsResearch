@@ -344,9 +344,11 @@ def get_blobs():
 
 
 if __name__ == "__main__":
+    # Parameters for loading text dataset (not used when using generated blobs)
     DOCUMENTS = 50
     REAL_CLUSTERS = 3
-    KRILL_CLUSTERS = REAL_CLUSTERS
+    # Parameters defining krill herd
+    KRILL_CLUSTERS = 3
     KRILL_COUNT = 25
     ITERS = 2500
 
